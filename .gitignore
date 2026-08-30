@@ -1,0 +1,18 @@
+# Environments
+venv/
+env/
+.env
+.conda/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Data 
+# NEVER push raw or processed datasets to GitHub
+data/raw/
+data/processed/
+
+# Weights & Biases logs
+wandb/
