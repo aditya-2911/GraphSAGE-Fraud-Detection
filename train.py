@@ -4,10 +4,12 @@ import torch
 import torch.nn as nn
 import wandb
 from sklearn.metrics import f1_score, recall_score
+from torch_geometric.utils import subgraph
 
 # Import the models we just wrote
 from src.models.baselines import MLPNet
 from src.models.graphsage import GraphSAGENet
+from src.models.graphsage import GCNNet
 
 
 def main(args):
@@ -29,9 +31,11 @@ def main(args):
         )
 
     data = torch.load(data_path, weights_only=False).to(device)
-    
+
+    # Filter out 'unknown' labels (class 2) from our masks
     labeled_mask = data.y != 2
     data.train_mask = data.train_mask & labeled_mask
+    data.val_mask = data.val_mask & labeled_mask  # <--- ADD THIS LINE
     data.test_mask = data.test_mask & labeled_mask
 
     # 3. Initialize the chosen Model
@@ -65,12 +69,18 @@ def main(args):
     best_val_f1 = 0.0
     os.makedirs("models/saved", exist_ok=True)
 
+    # PREVENT TEMPORAL DATA LEAKAGE:
+    # Create an edge_index that ONLY contains edges between training nodes.
+    train_nodes = data.train_mask.nonzero(as_tuple=False).view(-1)
+    train_edge_index, _ = subgraph(train_nodes, data.edge_index, relabel_nodes=False)
+
     for epoch in range(args.epochs):
         model.train()
         optimizer.zero_grad()
 
-        # Forward pass
-        out = model(data.x, data.edge_index)
+
+        # Forward pass (Strictly past edges only)
+        out = model(data.x, train_edge_index)
 
         # Calculate loss ONLY on the past training nodes
         loss = criterion(out[data.train_mask], data.y[data.train_mask])
@@ -83,8 +93,9 @@ def main(args):
             out = model(data.x, data.edge_index)
             pred = out.argmax(dim=1)
 
-            y_true = data.y[data.test_mask].cpu().numpy()
-            y_pred = pred[data.test_mask].cpu().numpy()
+            # Evaluate on the VALIDATION window (time steps 35-40)
+            y_true = data.y[data.val_mask].cpu().numpy()
+            y_pred = pred[data.val_mask].cpu().numpy()
 
             val_f1 = f1_score(y_true, y_pred, average="macro")
             val_recall = recall_score(

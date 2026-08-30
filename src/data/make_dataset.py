@@ -51,9 +51,10 @@ def process_data(raw_dir="data/raw", processed_dir="data/processed"):
     data = Data(x=features, edge_index=edge_index, y=labels, time_step=time_steps)
 
     # Create Temporal Masks for Inductive Learning
-    # Train on past (time_step < 35), Test on future (time_step >= 35)
-    data.train_mask = data.time_step < 35
-    data.test_mask = data.time_step >= 35
+    # Train on past, Validate on near-future, Test on far-future
+    data.train_mask = data.time_step <= 34
+    data.val_mask = (data.time_step > 34) & (data.time_step <= 40)
+    data.test_mask = data.time_step > 40
 
     # Save the processed data
     os.makedirs(processed_dir, exist_ok=True)

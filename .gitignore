@@ -16,3 +16,6 @@ data/processed/
 
 # Weights & Biases logs
 wandb/
+
+
+terminal_gridsearch.txt
